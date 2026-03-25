@@ -81,7 +81,13 @@ export default function GameCard({ game }: GameCardProps) {
       {showLineups && <Lineups gamePk={game.gamePk} />}
 
       {/* Expandable Odds */}
-      {showOdds && <BettingOdds gamePk={game.gamePk} />}
+      {showOdds && (
+        <BettingOdds 
+          gamePk={game.gamePk}
+          homeTeam={game.teams.home.team.name}
+          awayTeam={game.teams.away.team.name}
+        />
+      )}
     </div>
   )
 }

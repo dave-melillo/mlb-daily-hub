@@ -4,11 +4,13 @@ import useSWR from 'swr'
 
 interface BettingOddsProps {
   gamePk: number
+  homeTeam: string
+  awayTeam: string
 }
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-export default function BettingOdds({ gamePk }: BettingOddsProps) {
+export default function BettingOdds({ gamePk, homeTeam, awayTeam }: BettingOddsProps) {
   const { data, error, isLoading } = useSWR<any[]>(
     `/api/odds`,
     fetcher
@@ -32,8 +34,11 @@ export default function BettingOdds({ gamePk }: BettingOddsProps) {
     )
   }
 
-  // Find game by gamePk (would need better matching logic in production)
-  const gameOdds = data[0]
+  // Match game by team names
+  const gameOdds = data.find(game => {
+    return (game.home_team === homeTeam && game.away_team === awayTeam) ||
+           (game.home_team === awayTeam && game.away_team === homeTeam)
+  })
 
   if (!gameOdds) {
     return (
