@@ -4,11 +4,35 @@ import useSWR from 'swr'
 
 interface BettingOddsProps {
   gamePk: number
+  awayTeam: string
+  homeTeam: string
 }
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-export default function BettingOdds({ gamePk }: BettingOddsProps) {
+/**
+ * Match team names between MLB API and Odds API
+ * The Odds API uses full team names (e.g., "New York Yankees")
+ * while MLB API also uses full names, but we need fuzzy matching
+ * to handle potential variations
+ */
+function matchTeamNames(oddsTeam: string, mlbTeam: string): boolean {
+  const normalize = (name: string) => 
+    name.toLowerCase().replace(/[^a-z]/g, '')
+  
+  const oddsNorm = normalize(oddsTeam)
+  const mlbNorm = normalize(mlbTeam)
+  
+  // Exact match after normalization
+  if (oddsNorm === mlbNorm) return true
+  
+  // Check if one contains the other (handles "New York Yankees" vs "Yankees")
+  if (oddsNorm.includes(mlbNorm) || mlbNorm.includes(oddsNorm)) return true
+  
+  return false
+}
+
+export default function BettingOdds({ gamePk, awayTeam, homeTeam }: BettingOddsProps) {
   const { data, error, isLoading } = useSWR<any[]>(
     `/api/odds`,
     fetcher
@@ -32,8 +56,13 @@ export default function BettingOdds({ gamePk }: BettingOddsProps) {
     )
   }
 
-  // Find game by gamePk (would need better matching logic in production)
-  const gameOdds = data[0]
+  // Find game by matching team names
+  const gameOdds = data.find(game => {
+    // The Odds API structure has home_team and away_team fields
+    const hasHomeMatch = game.home_team && matchTeamNames(game.home_team, homeTeam)
+    const hasAwayMatch = game.away_team && matchTeamNames(game.away_team, awayTeam)
+    return hasHomeMatch && hasAwayMatch
+  })
 
   if (!gameOdds) {
     return (
