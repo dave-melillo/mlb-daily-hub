@@ -85,12 +85,12 @@ The app uses Supabase (PostgreSQL) to cache betting odds, player stats, and park
 **Option 1: Manual (Recommended)**
 1. Open [Supabase SQL Editor](https://supabase.com/dashboard)
 2. Go to your project → **SQL Editor** → **New query**
-3. Copy the contents of `/tmp/mlb-daily-hub-schema.sql`
+3. Copy the contents of `lib/supabase/schema.sql`
 4. Paste and click **Run**
 
 **Option 2: Using psql** (if installed)
 ```bash
-./scripts/apply-schema.sh
+psql postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres < lib/supabase/schema.sql
 ```
 
 ### Verify Setup
