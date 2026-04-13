@@ -18,6 +18,7 @@ A mobile-first, auto-refreshing dashboard for daily MLB games, lineups, stats, a
 - **TypeScript**
 - **Tailwind CSS**
 - **SWR** (data fetching with auto-revalidation)
+- **Supabase** (PostgreSQL database for caching and analytics)
 - **MLB Stats API** (free, comprehensive)
 - **The Odds API** (free tier: 500 req/month)
 
@@ -47,29 +48,94 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Environment Variables (Optional)
+### Environment Variables
 
-To enable betting odds, get a free API key from [The Odds API](https://the-odds-api.com/):
+Create a `.env.local` file with the following variables:
 
 ```bash
-ODDS_API_KEY=your_api_key_here
+# Supabase (required for caching)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# The Odds API (optional - for betting odds)
+ODDS_API_KEY=your_odds_api_key
+
+# Vercel Cron Secret (required for scheduled data fetching)
+CRON_SECRET=your_cron_secret
 ```
 
-**Note:** Free tier is limited to 500 requests/month (~16/day). Odds are cached for 1 hour to stay within limits.
+**Supabase Setup:**
+1. Create a free account at [supabase.com](https://supabase.com)
+2. Create a new project
+3. Go to **Project Settings → API** to get your URL and keys
+4. Apply the database schema (see Database Setup below)
+
+**Odds API Setup:**
+- Get a free API key from [The Odds API](https://the-odds-api.com/)
+- Free tier: 500 requests/month (~16/day)
+- Odds are cached in Supabase for 24 hours to stay within limits
+
+## Database Setup
+
+The app uses Supabase (PostgreSQL) to cache betting odds, player stats, and park factors.
+
+### Apply Database Schema
+
+**Option 1: Manual (Recommended)**
+1. Open [Supabase SQL Editor](https://supabase.com/dashboard)
+2. Go to your project → **SQL Editor** → **New query**
+3. Copy the contents of `lib/supabase/schema.sql`
+4. Paste and click **Run**
+
+**Option 2: Using psql** (if installed)
+```bash
+psql postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres < lib/supabase/schema.sql
+```
+
+### Verify Setup
+
+Run the connection test:
+
+```bash
+npx tsx lib/supabase/test-connection.ts
+```
+
+Expected output:
+```
+✅ Read access OK (0 rows in odds_snapshots)
+✅ Write access OK
+✅ Test data cleaned up
+✅ Table 'odds_snapshots' exists and is accessible
+✅ Table 'bvp_cache' exists and is accessible
+✅ Table 'park_factors' exists and is accessible
+```
+
+### Database Tables
+
+| Table | Purpose | Retention |
+|-------|---------|-----------|
+| `odds_snapshots` | 24-hour betting line movement tracking | 7 days (auto-cleanup) |
+| `bvp_cache` | Batter vs Pitcher matchup stats | 7 days (manual refresh) |
+| `park_factors` | Stadium HR/run factors by season | Updated monthly |
 
 ## API Routes
 
 - `GET /api/mlb/schedule?date=YYYY-MM-DD` - Fetch games for a specific date
 - `GET /api/mlb/lineups?gamePk=12345` - Fetch lineups for a specific game
-- `GET /api/odds` - Fetch betting odds for today's MLB games
+- `GET /api/odds` - Fetch betting odds for today's MLB games (cached in Supabase)
+- `GET /api/cron/fetch-odds` - Vercel Cron job (runs every 6 hours)
+- `GET /api/cron/scrape-parks` - Vercel Cron job (runs monthly)
 
 ## Caching Strategy
 
-| API | Cache Duration | Rationale |
-|-----|----------------|-----------|
-| MLB Schedule | 5 minutes | Games update frequently during live play |
-| Lineups | 10 minutes | Lineups change infrequently once set |
-| Betting Odds | 1 hour | Free tier limit (500 req/month) |
+| Data Source | Cache Location | Cache Duration | Rationale |
+|-------------|----------------|----------------|-----------|
+| MLB Schedule | SWR (client) | 5 minutes | Games update frequently during live play |
+| Lineups | SWR (client) | 10 minutes | Lineups change infrequently once set |
+| Betting Odds | Supabase DB | 6 hours (refreshed via cron) | Free tier limit (500 req/month) |
+| BvP Stats | Supabase DB | 7 days | Expensive to compute, rarely changes |
+| Park Factors | Supabase DB | 30 days | Static per season |
 
 ## Deployment
 
