@@ -1,0 +1,137 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+:root {
+  --badger-black: oklch(0.15 0 0);
+  --badger-ink: oklch(0.22 0 0);
+  --badger-gold: oklch(0.78 0.16 82);
+  --badger-gold-soft: oklch(0.85 0.12 82);
+  --badger-bone: oklch(0.97 0.005 80);
+  --badger-mute: oklch(0.65 0.02 80);
+  --badger-line: oklch(1 0 0 / 0.08);
+
+  --background: var(--badger-black);
+  --foreground: var(--badger-bone);
+  --card: var(--badger-ink);
+  --card-foreground: var(--badger-bone);
+  --primary: var(--badger-gold);
+  --primary-foreground: var(--badger-black);
+  --secondary: var(--badger-ink);
+  --secondary-foreground: var(--badger-bone);
+  --muted: var(--badger-ink);
+  --muted-foreground: var(--badger-mute);
+  --accent: var(--badger-gold);
+  --accent-foreground: var(--badger-black);
+  --destructive: oklch(0.65 0.21 27);
+  --border: var(--badger-line);
+  --input: var(--badger-line);
+  --ring: var(--badger-gold);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply font-sans;
+    background: var(--background);
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
+  }
+}
+
+/* Badge animation system */
+
+.badge-fx {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s ease,
+    filter 0.3s ease;
+  cursor: default;
+  will-change: transform;
+}
+.badge-fx:hover {
+  transform: translateY(-1px) scale(1.05);
+  filter: brightness(1.08);
+}
+.badge-fx::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    oklch(1 0 0 / 0.22) 50%,
+    transparent 70%
+  );
+  transform: translateX(-110%);
+  transition: transform 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+.badge-fx:hover::before {
+  transform: translateX(110%);
+}
+.badge-fx > * {
+  position: relative;
+  z-index: 1;
+}
+
+.badge-fx-gold:hover {
+  box-shadow:
+    0 0 0 1px oklch(0.78 0.16 82 / 0.5),
+    0 6px 24px -8px oklch(0.78 0.16 82 / 0.45);
+}
+
+.badge-pulse {
+  position: relative;
+}
+.badge-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.4;
+  animation: badgePulse 1.6s ease-out infinite;
+}
+@keyframes badgePulse {
+  0% { transform: scale(1); opacity: 0.55; }
+  70% { transform: scale(2.4); opacity: 0; }
+  100% { opacity: 0; }
+}
