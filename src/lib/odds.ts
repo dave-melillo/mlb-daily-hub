@@ -1,4 +1,5 @@
 import type { OddsLine } from '@/types';
+import { getCachedOdds, setCachedOdds } from './kv';
 
 const BASE = 'https://api.the-odds-api.com/v4';
 const SPORT = 'baseball_mlb';
@@ -6,7 +7,7 @@ const REGION = 'us';
 const MARKETS = 'h2h,spreads,totals';
 const PREFERRED_BOOK = 'draftkings';
 
-interface OddsApiEvent {
+export interface OddsApiEvent {
   id: string;
   commence_time: string;
   home_team: string;
@@ -22,14 +23,26 @@ interface OddsApiEvent {
   }>;
 }
 
+// Cache odds in KV for 10 minutes — the Odds API has a small monthly
+// budget (20K req) so we don't want every 60s mini heartbeat to spend
+// a request. Lines barely move minute-to-minute pre-game; 10 min is
+// plenty fresh.
+
 export async function fetchAllOdds(): Promise<OddsApiEvent[]> {
+  // Try cache first.
+  const cached = await getCachedOdds<OddsApiEvent[]>();
+  if (cached) return cached;
+
   const key = process.env.ODDS_API_KEY;
   if (!key) return [];
   const url = `${BASE}/sports/${SPORT}/odds?apiKey=${key}&regions=${REGION}&markets=${MARKETS}&oddsFormat=american`;
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return [];
-    return (await res.json()) as OddsApiEvent[];
+    const events = (await res.json()) as OddsApiEvent[];
+    // Persist for the next ~10 min of refreshes.
+    await setCachedOdds(events);
+    return events;
   } catch {
     return [];
   }
