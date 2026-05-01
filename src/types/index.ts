@@ -124,6 +124,8 @@ export interface BadgeResult {
   side?: BadgeSide;
   confidence: BadgeConfidence;
   reason: string;
+  /** Short magnitude shown inline on the chip — e.g. "1.47", "+153", "12.2 K/9". */
+  value?: string;
 }
 
 export interface EnrichedGame {

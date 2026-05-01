@@ -155,6 +155,7 @@ function evaluateAceEdge(g: EnrichedGame): BadgeResult {
     triggered: true,
     side,
     confidence,
+    value: `${absDiff.toFixed(2)} ERA`,
     reason: `${better.name} (${better.era?.toFixed(2)} ERA) vs ${worse.name} (${worse.era?.toFixed(2)})`,
   });
 }
@@ -178,6 +179,7 @@ function evaluateStrikeoutSpec(g: EnrichedGame): BadgeResult {
     triggered: true,
     side,
     confidence,
+    value: `${winner.k9!.toFixed(1)} K/9`,
     reason: `${winner.name} K/9 ${winner.k9!.toFixed(1)}`,
   });
 }
@@ -197,6 +199,7 @@ function evaluateBullpenBurnout(g: EnrichedGame): BadgeResult {
     triggered: true,
     side: benefits,
     confidence,
+    value: `${tiredIP.toFixed(0)} IP`,
     reason: `Opposing pen threw ${tiredIP.toFixed(1)} IP last 3 days`,
   });
 }
@@ -220,6 +223,7 @@ function evaluateHotBats(g: EnrichedGame): BadgeResult {
     triggered: true,
     side,
     confidence,
+    value: ops.toFixed(3).replace(/^0/, ''),
     reason: `Team OPS ${ops.toFixed(3)}`,
   });
 }
@@ -250,6 +254,7 @@ function evaluateSplitsMismatch(g: EnrichedGame): BadgeResult {
     triggered: true,
     side: winner.side,
     confidence,
+    value: `+${(winner.gap * 1000).toFixed(0)} pts`,
     reason: `Lineup ${(winner.ops).toFixed(3)} OPS vs hand (+${(winner.gap * 1000).toFixed(0)} pts)`,
   });
 }
@@ -266,6 +271,7 @@ function evaluatePowerPark(g: EnrichedGame): BadgeResult {
   return decorate('POWER_PARK', {
     triggered: true,
     confidence,
+    value: `${v.windMph} mph ↑`,
     reason: `${v.name} (PF ${v.parkFactor}) · wind ${v.windMph} mph OUT`,
   });
 }
@@ -285,6 +291,7 @@ function evaluateHomeCookin(g: EnrichedGame): BadgeResult {
     triggered: true,
     side: 'home',
     confidence,
+    value: `${(h * 100).toFixed(0)} / ${(aR * 100).toFixed(0)}`,
     reason: `Home ${(h * 100).toFixed(0)}% W%, road team ${(aR * 100).toFixed(0)}% on road`,
   });
 }
@@ -303,6 +310,7 @@ function evaluateTravelSpot(g: EnrichedGame): BadgeResult {
     triggered: true,
     side: benefits,
     confidence: 'MEDIUM',
+    value: 'late game',
     reason: 'Opponent on short rest after a late game last night',
   });
 }
@@ -358,6 +366,7 @@ function evaluateHeavyChalk(g: EnrichedGame): BadgeResult {
     triggered: true,
     side: heavySide,
     confidence,
+    value: `${ml}`,
     reason: `${heavySide === 'home' ? 'Home' : 'Away'} favorite at ${ml} — runline (-1.5) likely better number`,
   });
 }
@@ -387,6 +396,7 @@ function evaluatePlusMoneyDog(g: EnrichedGame): BadgeResult {
     triggered: true,
     side: dogSide,
     confidence,
+    value: `+${ml} · -${eraEdge.toFixed(2)} ERA`,
     reason: `Dog at +${ml} starts ${dogPitcher.name} (${dogPitcher.era.toFixed(2)} vs fav ${favPitcher.era.toFixed(2)})`,
   });
 }
@@ -407,6 +417,7 @@ function evaluateOverValue(g: EnrichedGame): BadgeResult {
   return decorate('OVER_VALUE', {
     triggered: true,
     confidence,
+    value: `O ${total}`,
     reason: `${v.name} (PF ${v.parkFactor}), wind ${v.windMph} OUT, total ${total}`,
   });
 }
@@ -435,6 +446,7 @@ function evaluateUnderValue(g: EnrichedGame): BadgeResult {
   return decorate('UNDER_VALUE', {
     triggered: true,
     confidence,
+    value: `U ${total}`,
     reason: `${v.name} (PF ${v.parkFactor}), ${aces} sub-3.50 ERA starter${aces === 2 ? 's' : ''}, total ${total}`,
   });
 }
@@ -452,6 +464,7 @@ function evaluateEliteArm(g: EnrichedGame): BadgeResult {
     triggered: true,
     side: winner.side,
     confidence: 'HIGH',
+    value: `${winner.p.era?.toFixed(2)} ERA`,
     reason: `${winner.p.name} ${winner.p.era?.toFixed(2)} ERA, ${winner.p.k9?.toFixed(1)} K/9, ${winner.p.whip?.toFixed(2)} WHIP`,
   });
 }
@@ -484,6 +497,7 @@ function evaluateUnderdogValue(g: EnrichedGame, prior: BadgeResult[]): BadgeResu
     triggered: true,
     side: dog,
     confidence,
+    value: `${dogBadges} sys · ${ml > 0 ? '+' : ''}${ml}`,
     reason: `Underdog (${ml > 0 ? '+' : ''}${ml}) has ${dogBadges} systems in their favor`,
   });
 }

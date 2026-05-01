@@ -1,6 +1,8 @@
 import { BADGE_META } from '@/lib/badges';
 import type { BadgeResult } from '@/types';
 import { cn } from '@/lib/utils';
+import { BadgeIcon } from './BadgeIcon';
+import { ConfidenceDots } from './ConfidenceDots';
 
 const TIER_STYLES: Record<BadgeResult['confidence'], string> = {
   HIGH: 'bg-primary/15 text-primary border-primary/40',
@@ -31,10 +33,17 @@ export function BadgeChip({ badge, homeAbbr, awayAbbr, className }: BadgeChipPro
         className,
       )}
     >
-      <span className="text-sm leading-none">{meta.emoji}</span>
+      <BadgeIcon code={badge.id} fallback={meta.emoji} />
       <span>{meta.name}</span>
+      {badge.value && (
+        <>
+          <span className="text-current/40">·</span>
+          <span className="font-mono text-[11px] tabular-nums opacity-90">{badge.value}</span>
+        </>
+      )}
+      <ConfidenceDots level={badge.confidence} className="ml-0.5" />
       {sideLabel && (
-        <span className="text-[10px] uppercase tracking-wider opacity-70 border-l border-current/20 pl-1.5 ml-1">
+        <span className="text-[10px] uppercase tracking-wider opacity-70 border-l border-current/20 pl-1.5 ml-0.5">
           {sideLabel}
         </span>
       )}

@@ -43,7 +43,7 @@ function rowsFromGame(g: EnrichedGame, hubBase: string) {
       matchupName,
       matchupHref: hubBase,
       date,
-      badge: { code: b.id, name: meta.name, emoji: meta.emoji },
+      badge: { code: b.id, name: meta.name, emoji: meta.emoji, value: b.value },
       side: sideLabel,
       confidence: b.confidence,
       reason: b.reason,
