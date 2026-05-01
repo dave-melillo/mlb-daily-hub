@@ -122,14 +122,14 @@ No data validator (no hand-curated data to validate). The pipeline itself is the
 
 ```bash
 # Today's enriched envelope
-curl -s https://mlb.badger-bets.com/api/games | jq
+curl -s https://mlb.badger-sports.com/api/games | jq
 
 # All triggered badges as BadgeLab rows
-curl -s https://mlb.badger-bets.com/api/badges | jq '.rows | length'
+curl -s https://mlb.badger-sports.com/api/badges | jq '.rows | length'
 
 # Manual refresh trigger (need CRON_SECRET)
 curl -X POST -H "Authorization: Bearer $CRON_SECRET" \
-  https://mlb.badger-bets.com/api/refresh
+  https://mlb.badger-sports.com/api/refresh
 ```
 
 On the Mac mini: `tail -f ~/badger/refresh.log` shows the heartbeat.

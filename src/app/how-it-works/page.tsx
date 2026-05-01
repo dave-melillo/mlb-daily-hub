@@ -55,7 +55,7 @@ export default function HowItWorksPage() {
       <p className="font-display tracking-[0.22em] text-xs text-primary mb-1">MLB</p>
       <h1 className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight">How It Works</h1>
       <p className="text-muted-foreground mt-3 max-w-2xl">
-        We pull every game on the slate, match it against fourteen betting systems,
+        We pull every game on the slate, match it against fourteen analysis systems,
         and light up a badge when a system triggers. The more badges stacked on a
         side, the louder the signal. The gold ones are the strongest.
       </p>
@@ -134,13 +134,13 @@ export default function HowItWorksPage() {
           </li>
           <li className="flex gap-3">
             <span className="font-display tracking-[0.18em] text-primary shrink-0">04.</span>
-            <span>Bet responsibly. Badges are signal, not certainty.</span>
+            <span>For entertainment only. Badges are signal, not certainty.</span>
           </li>
         </ul>
       </section>
 
       <p className="text-center text-xs text-muted-foreground py-6">
-        For entertainment purposes. Please bet responsibly.
+        For entertainment purposes only.
       </p>
     </main>
   );

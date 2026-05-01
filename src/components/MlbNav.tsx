@@ -3,9 +3,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-const BADGER_HOME = 'https://badger-bets.com';
-const FIGHT_URL = 'https://fight.badger-bets.com';
-const TRAX_URL = 'https://trax.badger-bets.com';
+const BADGER_HOME = 'https://badger-sports.com';
+const FIGHT_URL = 'https://fight.badger-sports.com';
+const TRAX_URL = 'https://trax.badger-sports.com';
 
 export function MlbNav() {
   return (
