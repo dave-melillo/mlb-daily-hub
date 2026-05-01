@@ -28,6 +28,12 @@ export function MlbNav() {
         </Link>
 
         <nav className="flex items-center gap-4 sm:gap-5 text-sm">
+          <Link
+            href="/how-it-works"
+            className="text-muted-foreground hover:text-primary transition-colors"
+          >
+            How
+          </Link>
           <a
             href={FIGHT_URL}
             className="hidden sm:inline-flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors"

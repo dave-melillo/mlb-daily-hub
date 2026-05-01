@@ -79,6 +79,46 @@ export const BADGE_META: Record<BadgeId, BadgeMeta> = {
     description:
       "Underdog has 3+ system badges in their favor — the line may be mispriced relative to where the math actually points.",
   },
+  HEAVY_CHALK: {
+    id: 'HEAVY_CHALK',
+    emoji: '🪨',
+    name: 'Heavy Chalk',
+    short: '-200 or shorter',
+    description:
+      'Moneyline favorite at -200 or shorter. Look at the runline (-1.5) for better number — heavy chalks historically cover the runline ~58% of the time.',
+  },
+  PLUS_MONEY_DOG: {
+    id: 'PLUS_MONEY_DOG',
+    emoji: '🎰',
+    name: 'Plus-Money Dog',
+    short: 'Underdog with arm',
+    description:
+      'Underdog at +130 to +180 whose starter has a 0.50+ ERA edge over the favorite. The market is paying you to back a competitive arm.',
+  },
+  OVER_VALUE: {
+    id: 'OVER_VALUE',
+    emoji: '🚀',
+    name: 'Over Value',
+    short: 'Park + wind ≥ total',
+    description:
+      'Hitter park (PF 105+) with wind blowing OUT 8+ mph — and the posted total is 8.5 or lower. The conditions tend to outpace the number.',
+  },
+  UNDER_VALUE: {
+    id: 'UNDER_VALUE',
+    emoji: '🧊',
+    name: 'Under Value',
+    short: 'Pitchers + low PF',
+    description:
+      'Pitcher park (PF ≤ 95), wind under 8 mph or blowing IN, total posted at 9 or higher, and at least one starter with sub-3.50 ERA. Lean Under.',
+  },
+  ELITE_ARM: {
+    id: 'ELITE_ARM',
+    emoji: '🏆',
+    name: 'Elite Arm',
+    short: 'Cy Young grade',
+    description:
+      'Starter combines K/9 ≥ 11, WHIP ≤ 1.05, and ERA ≤ 2.50 — peripheral stats consistent with Cy Young-grade dominance. Strikeout props and team-no-runs-in-N specials.',
+  },
 };
 
 const NEUTRAL: BadgeResult = {
@@ -281,6 +321,11 @@ export function evaluateAllBadges(game: EnrichedGame): BadgeResult[] {
     evaluatePowerPark,
     evaluateHomeCookin,
     evaluateTravelSpot,
+    evaluateHeavyChalk,
+    evaluatePlusMoneyDog,
+    evaluateOverValue,
+    evaluateUnderValue,
+    evaluateEliteArm,
   ];
   const results = evaluators.map((fn) => fn(game));
 
@@ -292,6 +337,131 @@ export function evaluateAllBadges(game: EnrichedGame): BadgeResult[] {
   return results
     .filter((r) => r.triggered)
     .sort((x, y) => order[x.confidence] - order[y.confidence]);
+}
+
+// ------------------------------------------------------------
+// New evaluators (May 2026 additions)
+// ------------------------------------------------------------
+
+function evaluateHeavyChalk(g: EnrichedGame): BadgeResult {
+  if (!g.odds) return decorate('HEAVY_CHALK', { triggered: false, confidence: 'LOW', reason: 'No odds posted' });
+  const homeML = g.odds.homeMoneyline;
+  const awayML = g.odds.awayMoneyline;
+  const heavySide: 'home' | 'away' | null =
+    homeML <= -200 ? 'home' : awayML <= -200 ? 'away' : null;
+  if (!heavySide) {
+    return decorate('HEAVY_CHALK', { triggered: false, confidence: 'LOW', reason: 'No -200 favorite' });
+  }
+  const ml = heavySide === 'home' ? homeML : awayML;
+  const confidence = ml <= -260 ? 'HIGH' : ml <= -220 ? 'MEDIUM' : 'LOW';
+  return decorate('HEAVY_CHALK', {
+    triggered: true,
+    side: heavySide,
+    confidence,
+    reason: `${heavySide === 'home' ? 'Home' : 'Away'} favorite at ${ml} — runline (-1.5) likely better number`,
+  });
+}
+
+function evaluatePlusMoneyDog(g: EnrichedGame): BadgeResult {
+  if (!g.odds) return decorate('PLUS_MONEY_DOG', { triggered: false, confidence: 'LOW', reason: 'No odds posted' });
+  const homeML = g.odds.homeMoneyline;
+  const awayML = g.odds.awayMoneyline;
+  const dogSide: 'home' | 'away' | null =
+    homeML >= 130 && homeML <= 180 ? 'home' :
+    awayML >= 130 && awayML <= 180 ? 'away' : null;
+  if (!dogSide) {
+    return decorate('PLUS_MONEY_DOG', { triggered: false, confidence: 'LOW', reason: 'No +130 to +180 dog' });
+  }
+  const dogPitcher = dogSide === 'home' ? g.home.pitcher : g.away.pitcher;
+  const favPitcher = dogSide === 'home' ? g.away.pitcher : g.home.pitcher;
+  if (!dogPitcher?.era || !favPitcher?.era) {
+    return decorate('PLUS_MONEY_DOG', { triggered: false, confidence: 'LOW', reason: 'Pitcher stats missing' });
+  }
+  const eraEdge = favPitcher.era - dogPitcher.era; // positive = dog has the better arm
+  if (eraEdge < 0.50) {
+    return decorate('PLUS_MONEY_DOG', { triggered: false, confidence: 'LOW', reason: 'Dog pitcher not better' });
+  }
+  const ml = dogSide === 'home' ? homeML : awayML;
+  const confidence = eraEdge >= 1.25 ? 'HIGH' : eraEdge >= 0.85 ? 'MEDIUM' : 'LOW';
+  return decorate('PLUS_MONEY_DOG', {
+    triggered: true,
+    side: dogSide,
+    confidence,
+    reason: `Dog at +${ml} starts ${dogPitcher.name} (${dogPitcher.era.toFixed(2)} vs fav ${favPitcher.era.toFixed(2)})`,
+  });
+}
+
+function evaluateOverValue(g: EnrichedGame): BadgeResult {
+  const v = g.venue;
+  if (!v || v.parkFactor < 105) {
+    return decorate('OVER_VALUE', { triggered: false, confidence: 'LOW', reason: 'Not a hitter park' });
+  }
+  if (v.windMph == null || v.windDir !== 'OUT' || v.windMph < 8) {
+    return decorate('OVER_VALUE', { triggered: false, confidence: 'LOW', reason: 'No carry wind' });
+  }
+  const total = g.odds?.total;
+  if (total == null || total > 8.5) {
+    return decorate('OVER_VALUE', { triggered: false, confidence: 'LOW', reason: 'Total already inflated' });
+  }
+  const confidence = v.windMph >= 14 ? 'HIGH' : v.windMph >= 11 ? 'MEDIUM' : 'LOW';
+  return decorate('OVER_VALUE', {
+    triggered: true,
+    confidence,
+    reason: `${v.name} (PF ${v.parkFactor}), wind ${v.windMph} OUT, total ${total}`,
+  });
+}
+
+function evaluateUnderValue(g: EnrichedGame): BadgeResult {
+  const v = g.venue;
+  if (!v || v.parkFactor > 95) {
+    return decorate('UNDER_VALUE', { triggered: false, confidence: 'LOW', reason: 'Not a pitcher park' });
+  }
+  // No carry wind: either wind unknown, calm, or blowing IN.
+  const carryFactor = v.windMph != null && v.windDir === 'OUT' && v.windMph >= 8;
+  if (carryFactor) {
+    return decorate('UNDER_VALUE', { triggered: false, confidence: 'LOW', reason: 'Wind suppresses Under' });
+  }
+  const total = g.odds?.total;
+  if (total == null || total < 9) {
+    return decorate('UNDER_VALUE', { triggered: false, confidence: 'LOW', reason: 'Total already low' });
+  }
+  const aces =
+    (g.home.pitcher?.era != null && g.home.pitcher.era <= 3.5 ? 1 : 0) +
+    (g.away.pitcher?.era != null && g.away.pitcher.era <= 3.5 ? 1 : 0);
+  if (aces === 0) {
+    return decorate('UNDER_VALUE', { triggered: false, confidence: 'LOW', reason: 'Neither starter sub-3.50' });
+  }
+  const confidence = aces === 2 ? 'HIGH' : 'MEDIUM';
+  return decorate('UNDER_VALUE', {
+    triggered: true,
+    confidence,
+    reason: `${v.name} (PF ${v.parkFactor}), ${aces} sub-3.50 ERA starter${aces === 2 ? 's' : ''}, total ${total}`,
+  });
+}
+
+function evaluateEliteArm(g: EnrichedGame): BadgeResult {
+  const candidates: Array<{ side: 'home' | 'away'; p: PitcherStats }> = [];
+  if (g.home.pitcher && isElite(g.home.pitcher)) candidates.push({ side: 'home', p: g.home.pitcher });
+  if (g.away.pitcher && isElite(g.away.pitcher)) candidates.push({ side: 'away', p: g.away.pitcher });
+  if (!candidates.length) {
+    return decorate('ELITE_ARM', { triggered: false, confidence: 'LOW', reason: 'No elite-grade starter' });
+  }
+  candidates.sort((a, b) => (a.p.era ?? 99) - (b.p.era ?? 99));
+  const winner = candidates[0];
+  return decorate('ELITE_ARM', {
+    triggered: true,
+    side: winner.side,
+    confidence: 'HIGH',
+    reason: `${winner.p.name} ${winner.p.era?.toFixed(2)} ERA, ${winner.p.k9?.toFixed(1)} K/9, ${winner.p.whip?.toFixed(2)} WHIP`,
+  });
+}
+
+function isElite(p: PitcherStats): boolean {
+  if (p.ip < 30) return false;
+  if (p.era == null || p.era > 2.5) return false;
+  if (p.whip == null || p.whip > 1.05) return false;
+  if (p.k9 == null || p.k9 < 11) return false;
+  return true;
 }
 
 function evaluateUnderdogValue(g: EnrichedGame, prior: BadgeResult[]): BadgeResult {

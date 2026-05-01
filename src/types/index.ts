@@ -100,7 +100,12 @@ export type BadgeId =
   | 'POWER_PARK'
   | 'HOME_COOKIN'
   | 'TRAVEL_SPOT'
-  | 'UNDERDOG_VALUE';
+  | 'UNDERDOG_VALUE'
+  | 'HEAVY_CHALK'
+  | 'PLUS_MONEY_DOG'
+  | 'OVER_VALUE'
+  | 'UNDER_VALUE'
+  | 'ELITE_ARM';
 
 export type BadgeConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
 export type BadgeSide = 'home' | 'away';
