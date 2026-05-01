@@ -65,7 +65,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const rows = envelope.games.flatMap((g) => rowsFromGame(g, hubBase));
+  // BadgeLab only cares about upcoming/live games — drop finals.
+  const rows = envelope.games
+    .filter((g) => g.status.abstract !== 'Final')
+    .flatMap((g) => rowsFromGame(g, hubBase));
   return NextResponse.json({
     sport: 'MLB',
     date,
