@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Bebas_Neue } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 import { MlbNav } from '@/components/MlbNav';
 
@@ -37,6 +39,8 @@ export default function RootLayout({
           <MlbNav />
           {children}
         </div>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
