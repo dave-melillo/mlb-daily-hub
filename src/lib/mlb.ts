@@ -1,14 +1,8 @@
-import type {
-  EnrichedGame,
-  PitcherStats,
-  TeamForm,
-  PitchHand,
-} from '@/types';
+import type { PitcherStats, PitchHand, TeamForm } from '@/types';
+import { format, subDays } from 'date-fns';
 
 const BASE = 'https://statsapi.mlb.com/api/v1';
 
-// MLB Stats API has no auth and very generous rate limits, but we still
-// dedupe identical fetches within a single refresh pass.
 const inflight = new Map<string, Promise<unknown>>();
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -37,6 +31,7 @@ interface RawScheduleResponse {
     games: Array<{
       gamePk: number;
       gameDate: string;
+      officialDate?: string;
       status: { abstractGameState: string; detailedState: string };
       teams: {
         away: { team: { id: number; name: string; abbreviation: string }; score?: number; probablePitcher?: { id: number; fullName: string } };
@@ -49,6 +44,11 @@ interface RawScheduleResponse {
 
 export async function fetchScheduleWithProbables(date: string) {
   const url = `${BASE}/schedule?sportId=1&date=${date}&hydrate=team,linescore,probablePitcher`;
+  return fetchJson<RawScheduleResponse>(url);
+}
+
+export async function fetchSchedule(date: string) {
+  const url = `${BASE}/schedule?sportId=1&date=${date}&hydrate=team`;
   return fetchJson<RawScheduleResponse>(url);
 }
 
@@ -108,67 +108,150 @@ export async function fetchPitcherStats(playerId: number, season: number): Promi
 }
 
 // ============================================================
-// Team form (last10, home/road records)
+// Team records via standings (one call, all teams)
 // ============================================================
 
-interface RawTeamResponse {
-  teams: Array<{
-    id: number;
-    record?: {
+interface RawStandingsResponse {
+  records: Array<{
+    teamRecords: Array<{
+      team: { id: number };
       records?: {
         splitRecords?: Array<{ type: string; wins: number; losses: number; pct: string }>;
       };
-      wins?: number;
-      losses?: number;
-    };
+    }>;
   }>;
 }
 
-export async function fetchTeamForm(teamId: number, season: number): Promise<Partial<TeamForm>> {
-  const url = `${BASE}/teams/${teamId}?hydrate=record(currentSeason=${season},type=splits)`;
+export interface TeamRecord {
+  homeWinPct: number | null;
+  roadWinPct: number | null;
+  last10WinPct: number;
+}
+
+export async function fetchAllTeamRecords(season: number): Promise<Map<number, TeamRecord>> {
+  const url = `${BASE}/standings?leagueId=103,104&season=${season}`;
+  const map = new Map<number, TeamRecord>();
   try {
-    const data = await fetchJson<RawTeamResponse>(url);
-    const splits = data.teams?.[0]?.record?.records?.splitRecords ?? [];
-    const lookup = (type: string) => splits.find((s) => s.type === type);
-    const last10 = lookup('lastTen');
-    const home = lookup('home');
-    const away = lookup('away');
-    const lastTenPct = last10 && last10.wins + last10.losses > 0
-      ? last10.wins / (last10.wins + last10.losses)
-      : 0;
-    const pct = (rec?: { wins: number; losses: number }) =>
-      rec && rec.wins + rec.losses > 0 ? rec.wins / (rec.wins + rec.losses) : null;
+    const data = await fetchJson<RawStandingsResponse>(url);
+    for (const div of data.records ?? []) {
+      for (const tr of div.teamRecords ?? []) {
+        const splits = tr.records?.splitRecords ?? [];
+        const lookup = (type: string) => splits.find((s) => s.type === type);
+        const home = lookup('home');
+        const away = lookup('away');
+        const last10 = lookup('lastTen');
+        const pct = (rec?: { wins: number; losses: number }) =>
+          rec && rec.wins + rec.losses > 0 ? rec.wins / (rec.wins + rec.losses) : null;
+        map.set(tr.team.id, {
+          homeWinPct: pct(home),
+          roadWinPct: pct(away),
+          last10WinPct: pct(last10) ?? 0,
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[mlb] standings fetch failed', err);
+  }
+  return map;
+}
+
+// ============================================================
+// Team hitting (season OPS + vs LHP/RHP splits)
+// ============================================================
+
+interface RawHittingResponse {
+  stats?: Array<{
+    splits: Array<{
+      split?: { description?: string };
+      stat: { ops?: string | number };
+    }>;
+  }>;
+}
+
+export interface TeamHitting {
+  seasonOPS: number | null;
+  vsLHP_OPS: number | null;
+  vsRHP_OPS: number | null;
+}
+
+const num = (v: string | number | undefined): number | null =>
+  v == null ? null : typeof v === 'number' ? v : Number(v);
+
+export async function fetchTeamHitting(teamId: number, season: number): Promise<TeamHitting> {
+  const seasonUrl = `${BASE}/teams/${teamId}/stats?season=${season}&group=hitting&stats=season`;
+  const splitsUrl = `${BASE}/teams/${teamId}/stats?season=${season}&group=hitting&stats=statSplits&sitCodes=vl,vr`;
+  try {
+    const [seasonResp, splitsResp] = await Promise.all([
+      fetchJson<RawHittingResponse>(seasonUrl),
+      fetchJson<RawHittingResponse>(splitsUrl),
+    ]);
+    const seasonOPS = num(seasonResp.stats?.[0]?.splits?.[0]?.stat?.ops);
+    const splits = splitsResp.stats?.[0]?.splits ?? [];
+    const vsL = splits.find((s) => s.split?.description?.startsWith('vs Left'));
+    const vsR = splits.find((s) => s.split?.description?.startsWith('vs Right'));
     return {
-      teamId,
-      last10WinPct: lastTenPct,
-      homeWinPct: pct(home),
-      roadWinPct: pct(away),
-      // Stats below need game-log aggregation — left null in Phase 1.
-      last10OPS: null,
-      vsLHP_OPS: null,
-      vsRHP_OPS: null,
-      bullpenIPLast3Days: 0,
-      closerRested: false,
-      lastGameLocalEndTime: null,
-      homeTimeZone: null,
+      seasonOPS,
+      vsLHP_OPS: num(vsL?.stat?.ops),
+      vsRHP_OPS: num(vsR?.stat?.ops),
     };
   } catch {
-    return { teamId };
+    return { seasonOPS: null, vsLHP_OPS: null, vsRHP_OPS: null };
   }
+}
+
+// ============================================================
+// Yesterday's schedule (for travel-spot signal)
+// ============================================================
+
+export interface YesterdayGame {
+  teamId: number;
+  startTimeIso: string;
+  venueId?: number;
+  venueName?: string;
+}
+
+export async function fetchYesterdayPlayMap(forDate: string): Promise<Map<number, YesterdayGame>> {
+  const yesterday = format(subDays(new Date(forDate), 1), 'yyyy-MM-dd');
+  const map = new Map<number, YesterdayGame>();
+  try {
+    const data = await fetchSchedule(yesterday);
+    const games = data.dates?.[0]?.games ?? [];
+    for (const g of games) {
+      const entry = (teamId: number) => ({
+        teamId,
+        startTimeIso: g.gameDate,
+        venueId: g.venue?.id,
+        venueName: g.venue?.name,
+      });
+      map.set(g.teams.home.team.id, entry(g.teams.home.team.id));
+      map.set(g.teams.away.team.id, entry(g.teams.away.team.id));
+    }
+  } catch (err) {
+    console.error('[mlb] yesterday schedule fetch failed', err);
+  }
+  return map;
 }
 
 // ============================================================
 // Helpers
 // ============================================================
 
-export function statusFor(abstract: string): EnrichedGame['status']['abstract'] {
-  if (abstract === 'Live') return 'Live';
-  if (abstract === 'Final') return 'Final';
-  return 'Preview';
+export function statusFor(abstract: string) {
+  if (abstract === 'Live') return 'Live' as const;
+  if (abstract === 'Final') return 'Final' as const;
+  return 'Preview' as const;
 }
 
+// Season heuristic — MLB plays Mar–Oct. If we're in Jan–Feb,
+// the meaningful "current season" is last calendar year (offseason).
 export const CURRENT_SEASON = (() => {
   const now = new Date();
-  // MLB season typically runs Mar–Oct; assume current calendar year.
+  const month = now.getUTCMonth() + 1; // 1..12
+  if (month < 3) return now.getUTCFullYear() - 1;
   return now.getUTCFullYear();
 })();
+
+// Pulled in for back-compat.
+export async function fetchTeamForm(_teamId: number, _season: number): Promise<Partial<TeamForm>> {
+  return {};
+}

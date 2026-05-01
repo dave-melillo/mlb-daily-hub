@@ -99,18 +99,18 @@ function decorate(id: BadgeId, partial: Omit<BadgeResult, 'id'>): BadgeResult {
 function evaluateAceEdge(g: EnrichedGame): BadgeResult {
   const h = g.home.pitcher;
   const a = g.away.pitcher;
-  if (!h?.era || !a?.era || h.ip < 50 || a.ip < 50) {
+  if (!h?.era || !a?.era || h.ip < 30 || a.ip < 30) {
     return decorate('ACE_EDGE', { triggered: false, confidence: 'LOW', reason: 'Insufficient IP' });
   }
   const diff = a.era - h.era;
   const absDiff = Math.abs(diff);
-  if (absDiff < 1.0) {
-    return decorate('ACE_EDGE', { triggered: false, confidence: 'LOW', reason: 'ERA gap < 1.00' });
+  if (absDiff < 0.85) {
+    return decorate('ACE_EDGE', { triggered: false, confidence: 'LOW', reason: 'ERA gap too small' });
   }
   const side: 'home' | 'away' = diff > 0 ? 'home' : 'away';
   const better = side === 'home' ? h : a;
   const worse = side === 'home' ? a : h;
-  const confidence = absDiff >= 2.0 ? 'HIGH' : absDiff >= 1.5 ? 'MEDIUM' : 'LOW';
+  const confidence = absDiff >= 1.75 ? 'HIGH' : absDiff >= 1.25 ? 'MEDIUM' : 'LOW';
   return decorate('ACE_EDGE', {
     triggered: true,
     side,
@@ -162,10 +162,12 @@ function evaluateBullpenBurnout(g: EnrichedGame): BadgeResult {
 }
 
 function evaluateHotBats(g: EnrichedGame): BadgeResult {
+  // Phase 1: use season OPS (last10OPS reserved for the day we wire game logs).
   const h = g.home.form?.last10OPS;
   const a = g.away.form?.last10OPS;
-  const hotHome = h != null && h >= 0.8;
-  const hotAway = a != null && a >= 0.8;
+  const THRESH = 0.770; // top-third of MLB
+  const hotHome = h != null && h >= THRESH;
+  const hotAway = a != null && a >= THRESH;
   if (!hotHome && !hotAway) {
     return decorate('HOT_BATS', { triggered: false, confidence: 'LOW', reason: 'No hot lineup' });
   }
@@ -173,12 +175,12 @@ function evaluateHotBats(g: EnrichedGame): BadgeResult {
     ? (h! >= a! ? 'home' : 'away')
     : (hotHome ? 'home' : 'away');
   const ops = side === 'home' ? h! : a!;
-  const confidence = ops >= 0.9 ? 'HIGH' : ops >= 0.85 ? 'MEDIUM' : 'LOW';
+  const confidence = ops >= 0.85 ? 'HIGH' : ops >= 0.81 ? 'MEDIUM' : 'LOW';
   return decorate('HOT_BATS', {
     triggered: true,
     side,
     confidence,
-    reason: `Last-10 OPS ${ops.toFixed(3)}`,
+    reason: `Team OPS ${ops.toFixed(3)}`,
   });
 }
 
@@ -248,22 +250,11 @@ function evaluateHomeCookin(g: EnrichedGame): BadgeResult {
 }
 
 function evaluateTravelSpot(g: EnrichedGame): BadgeResult {
-  // Disadvantage team that played late + traveled west-to-east into early game.
-  // We don't have full schedule context here — caller fills lastGameLocalEndTime + homeTimeZone.
-  // Heuristic: if either side's lastGameLocalEndTime is past 9pm local AND today's gameDate
-  // is < 14 hours later, flag the OTHER side.
-  function tiredSide(side: 'home' | 'away'): boolean {
-    const form = side === 'home' ? g.home.form : g.away.form;
-    if (!form?.lastGameLocalEndTime) return false;
-    const lastEnd = new Date(form.lastGameLocalEndTime).getTime();
-    const today = new Date(g.gameDate).getTime();
-    const hoursBetween = (today - lastEnd) / (1000 * 60 * 60);
-    if (hoursBetween < 0 || hoursBetween > 14) return false;
-    const lastHour = new Date(form.lastGameLocalEndTime).getHours();
-    return lastHour >= 21 || lastHour <= 1;
-  }
-  const homeTired = tiredSide('home');
-  const awayTired = tiredSide('away');
+  // Caller (refresh.ts) sets `lastGameLocalEndTime` only when the team played
+  // a 9pm+ ET game last night. If exactly one side did, the badge favors the
+  // other side.
+  const homeTired = !!g.home.form?.lastGameLocalEndTime;
+  const awayTired = !!g.away.form?.lastGameLocalEndTime;
   if (homeTired === awayTired) {
     return decorate('TRAVEL_SPOT', { triggered: false, confidence: 'LOW', reason: 'No travel mismatch' });
   }
@@ -272,7 +263,7 @@ function evaluateTravelSpot(g: EnrichedGame): BadgeResult {
     triggered: true,
     side: benefits,
     confidence: 'MEDIUM',
-    reason: 'Opponent on short rest after late game + travel',
+    reason: 'Opponent on short rest after a late game last night',
   });
 }
 

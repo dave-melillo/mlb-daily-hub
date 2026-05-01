@@ -44,12 +44,18 @@ export function matchOddsToGame(
   homeTeamName: string,
   awayTeamName: string,
 ): OddsLine | undefined {
-  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '');
-  const target = events.find(
-    (e) =>
-      (norm(e.home_team).includes(norm(homeTeamName)) || norm(homeTeamName).includes(norm(e.home_team))) &&
-      (norm(e.away_team).includes(norm(awayTeamName)) || norm(awayTeamName).includes(norm(e.away_team))),
-  );
+  // Match by the team's last word (mascot). MLB sends "New York Yankees",
+  // Odds API sends the same; the last token (Yankees) is unique league-wide.
+  const lastWord = (s: string) =>
+    s.toLowerCase().trim().split(/\s+/).pop() ?? '';
+  const homeLast = lastWord(homeTeamName);
+  const awayLast = lastWord(awayTeamName);
+
+  const target = events.find((e) => {
+    const eHomeLast = lastWord(e.home_team);
+    const eAwayLast = lastWord(e.away_team);
+    return eHomeLast === homeLast && eAwayLast === awayLast;
+  });
   if (!target) return undefined;
 
   const book =
